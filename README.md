@@ -3,8 +3,7 @@
 ## Overview
 
 Copy code from https://github.com/Zhwt/go-mcp-mysql/ and with ai help, I change db from mysql to postgres.
-
-Zero burden, ready-to-use Model Context Protocol (MCP) server for interacting with Postgres and automation. No Node.js or Python environment needed. This server provides tools to do CRUD operations on Postgres databases and tables, and a read-only mode to prevent surprise write operations. You can also make the MCP server check the query plan by using a `EXPLAIN` statement before executing the query by adding a `--with-explain-check` flag.
+Zero burden, ready-to-use Model Context Protocol (MCP) server for interacting with Postgres and automation. No Node.js or Python environment needed. This server provides tools to do CRUD operations on MySQL databases and tables, and a read-only mode to prevent surprise write operations. You can also make the MCP server check the query plan by using a `EXPLAIN` statement before executing the query by adding a `--with-explain-check` flag.
 
 Please note that this is a work in progress and may not yet be ready for production use.
 
@@ -20,7 +19,7 @@ go install -v github.com/guoling2008/go-mcp-postgres@latest
 
 ## Usage
 
-### Method A: Using Command Line Arguments
+### Method A: Using Command Line Arguments for stdio mode
 
 ```json
 {
@@ -52,6 +51,10 @@ Note: For those who put the binary outside of your `$PATH`, you need to replace 
   }
 }
 ```
+
+### Method B: Using Command Line Arguments for sse mode
+
+./go-mcp-postgres --t sse --ip x.x.x.x --port nnnn --dsn postgresql://user:pass@host:port/db
 
 ### Optional Flags
 
@@ -95,7 +98,7 @@ Note: For those who put the binary outside of your `$PATH`, you need to replace 
     - Parameters:
         - `name`: The name of the table to describe.
     - Returns: The structure of the table.
-
+  
 ### Data Tools
 
 1. `read_query`
@@ -125,7 +128,14 @@ Note: For those who put the binary outside of your `$PATH`, you need to replace 
     - Parameters:
         - `query`: The SQL query to execute.
     - Returns: x rows affected.
+    
+5. `count_query`
 
+    - Query the number of rows in a certain table..
+    - Parameters:
+        - `name`: The name of the table to count.
+    - Returns: The row number of the table.
+    
 Big thanks to https://github.com/Zhwt/go-mcp-mysql/ again.
 
 ## License

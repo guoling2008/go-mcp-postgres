@@ -24,18 +24,16 @@ const (
 )
 
 var (
-	Host string
-	User string
-	Pass string
-	Port int
-	Db   string
-
 	DSN string
 
 	ReadOnly         bool
 	WithExplainCheck bool
 
 	DB *sqlx.DB
+
+	Transport string
+	IPaddress string
+	Port      int
 )
 
 type ExplainResult struct {
@@ -59,25 +57,23 @@ type ShowCreateTableResult struct {
 }
 
 func main() {
-	flag.StringVar(&Host, "host", "localhost", "POSTGRES hostname")
-	flag.StringVar(&User, "user", "root", "POSTGRES username")
-	flag.StringVar(&Pass, "pass", "", "POSTGRES password")
-	flag.IntVar(&Port, "port", 5432, "POSTGRES port")
-	flag.StringVar(&Db, "db", "", "POSTGRES database")
 
 	flag.StringVar(&DSN, "dsn", "", "POSTGRES DSN")
 
 	flag.BoolVar(&ReadOnly, "read-only", false, "Enable read-only mode")
 	flag.BoolVar(&WithExplainCheck, "with-explain-check", false, "Check query plan with `EXPLAIN` before executing")
-	flag.Parse()
 
-	if len(DSN) == 0 {
-		DSN = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", User, Pass, Host, Port, Db)
-	}
+	flag.StringVar(&Transport, "t", "stdio", "Transport type (stdio or sse)")
+	flag.IntVar(&Port, "port", 8080, "sse port")
+	flag.StringVar(&IPaddress, "ip", "localhost", "servcer ip address")
+	flag.Parse()
 
 	s := server.NewMCPServer(
 		"go-mcp-postgres",
-		"0.1.0",
+		"0.1.1",
+		server.WithResourceCapabilities(true, true),
+		server.WithPromptCapabilities(true),
+		server.WithLogging(),
 	)
 
 	// Schema Tools
@@ -128,6 +124,15 @@ func main() {
 		),
 	)
 
+	countQueryTool := mcp.NewTool(
+		"count_query",
+		mcp.WithDescription("Query the number of rows in a certain table."),
+		mcp.WithString("name",
+			mcp.Required(),
+			mcp.Description("The name of the table to query"),
+		),
+	)
+
 	writeQueryTool := mcp.NewTool(
 		"write_query",
 		mcp.WithDescription("Execute a write SQL query. Make sure you have knowledge of the table structure before executing the query. Make sure the data types match the columns' definitions"),
@@ -158,7 +163,7 @@ func main() {
 	s.AddTool(listDatabaseTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, err := HandleQuery("SELECT datname FROM pg_database WHERE datistemplate = false;", StatementTypeNoExplainCheck)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return nil, nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -167,7 +172,7 @@ func main() {
 	s.AddTool(listTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, err := HandleQuery("SELECT table_schema,table_name FROM information_schema.tables ORDER BY table_schema,table_name;", StatementTypeNoExplainCheck)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return nil, nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -177,7 +182,7 @@ func main() {
 		s.AddTool(createTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleExec(request.Params.Arguments["query"].(string), StatementTypeNoExplainCheck)
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
@@ -188,17 +193,25 @@ func main() {
 		s.AddTool(alterTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleExec(request.Params.Arguments["query"].(string), StatementTypeNoExplainCheck)
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
 		})
 	}
+	s.AddTool(listTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		result, err := HandleQuery("SELECT table_schema,table_name FROM information_schema.tables ORDER BY table_schema,table_name;", StatementTypeNoExplainCheck)
+		if err != nil {
+			return nil, nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
 	/*
 		s.AddTool(descTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleDescTable(request.Params.Arguments["name"].(string))
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
@@ -207,7 +220,15 @@ func main() {
 	s.AddTool(readQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, err := HandleQuery(request.Params.Arguments["query"].(string), StatementTypeSelect)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return nil, nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
+	s.AddTool(countQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		result, err := HandleQuery("SELECT count(1) from "+request.Params.Arguments["name"].(string)+";", StatementTypeNoExplainCheck)
+		if err != nil {
+			return nil, nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -217,7 +238,7 @@ func main() {
 		s.AddTool(writeQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleExec(request.Params.Arguments["query"].(string), StatementTypeInsert)
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
@@ -228,7 +249,7 @@ func main() {
 		s.AddTool(updateQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleExec(request.Params.Arguments["query"].(string), StatementTypeUpdate)
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
@@ -239,16 +260,26 @@ func main() {
 		s.AddTool(deleteQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result, err := HandleExec(request.Params.Arguments["query"].(string), StatementTypeDelete)
 			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
+				return nil, nil
 			}
 
 			return mcp.NewToolResultText(result), nil
 		})
 	}
 
-	if err := server.ServeStdio(s); err != nil {
-		log.Fatalf("Server error: %v", err)
+	// Only check for "sse" since stdio is the default
+	if Transport == "sse" {
+		sseServer := server.NewSSEServer(s, server.WithBaseURL(fmt.Sprintf("http://%s:%d", IPaddress, Port)))
+		//log.Printf("SSE server listening on : %d", Port)
+		if err := sseServer.Start(fmt.Sprintf("%s:%d", IPaddress, Port)); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	} else {
+		if err := server.ServeStdio(s); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
 	}
+
 }
 
 func GetDB() (*sqlx.DB, error) {
