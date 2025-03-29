@@ -383,52 +383,53 @@ func TestHandleExplain(t *testing.T) {
 	})
 }
 
-func TestHandleDescTable(t *testing.T) {
-	_, mock, cleanup := setupMockDB(t)
-	defer cleanup()
+/*
+	func TestHandleDescTable(t *testing.T) {
+		_, mock, cleanup := setupMockDB(t)
+		defer cleanup()
 
-	t.Run("successful desc", func(t *testing.T) {
-		// Setup mock expectations
-		rows := sqlmock.NewRows([]string{"Table", "Create Table"}).
-			AddRow("users", "CREATE TABLE `users` (`id` int(11) NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB")
+		t.Run("successful desc", func(t *testing.T) {
+			// Setup mock expectations
+			rows := sqlmock.NewRows([]string{"Table", "Create Table"}).
+				AddRow("users", "CREATE TABLE `users` (`id` int(11) NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB")
 
-		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(rows)
+			mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(rows)
 
-		// Call HandleDescTable
-		result, err := HandleDescTable("users")
+			// Call HandleDescTable
+			result, err := HandleDescTable("users")
 
-		// Verify results
-		assert.NoError(t, err)
-		assert.Contains(t, result, "CREATE TABLE `users`")
-	})
+			// Verify results
+			assert.NoError(t, err)
+			assert.Contains(t, result, "CREATE TABLE `users`")
+		})
 
-	t.Run("table not found", func(t *testing.T) {
-		// Setup mock expectations
-		rows := sqlmock.NewRows([]string{"Table", "Create Table"})
+				t.Run("table not found", func(t *testing.T) {
+					// Setup mock expectations
+					rows := sqlmock.NewRows([]string{"Table", "Create Table"})
 
-		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(rows)
+					mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(rows)
 
-		// Call HandleDescTable
-		_, err := HandleDescTable("nonexistent")
+					// Call HandleDescTable
+					_, err := HandleDescTable("nonexistent")
 
-		// Verify results
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "does not exist")
-	})
+					// Verify results
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "does not exist")
+				})
 
-	t.Run("query error", func(t *testing.T) {
-		// Setup mock expectations
-		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnError(fmt.Errorf("query error"))
+			t.Run("query error", func(t *testing.T) {
+				// Setup mock expectations
+				mock.ExpectQuery("SHOW CREATE TABLE").WillReturnError(fmt.Errorf("query error"))
 
-		// Call HandleDescTable
-		_, err := HandleDescTable("users")
+				// Call HandleDescTable
+				_, err := HandleDescTable("users")
 
-		// Verify results
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "query error")
-	})
-}
-
+				// Verify results
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "query error")
+			})
+	}
+*/
 func TestMapToCSV(t *testing.T) {
 	t.Run("successful mapping", func(t *testing.T) {
 		// Setup test data

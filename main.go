@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -13,7 +14,13 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/text/language"
 )
+
+//go:embed locales/*
+var localeFS embed.FS
 
 const (
 	StatementTypeNoExplainCheck = ""
@@ -34,6 +41,8 @@ var (
 	Transport string
 	IPaddress string
 	Port      int
+
+	Lang string
 )
 
 type ExplainResult struct {
@@ -58,19 +67,45 @@ type ShowCreateTableResult struct {
 
 func main() {
 
-	flag.StringVar(&DSN, "dsn", "", "POSTGRES DSN")
+	// 初始化i18n
+	bundle := i18n.NewBundle(language.English)
+	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
+	flag.StringVar(&DSN, "dsn", "", "POSTGRES DSN")
 	flag.BoolVar(&ReadOnly, "read-only", false, "Enable read-only mode")
 	flag.BoolVar(&WithExplainCheck, "with-explain-check", false, "Check query plan with `EXPLAIN` before executing")
 
 	flag.StringVar(&Transport, "t", "stdio", "Transport type (stdio or sse)")
-	flag.IntVar(&Port, "port", 8080, "sse port")
-	flag.StringVar(&IPaddress, "ip", "localhost", "servcer ip address")
+	flag.IntVar(&Port, "port", 8080, "sse server port")
+	flag.StringVar(&IPaddress, "ip", "localhost", "server ip address")
+
+	flag.StringVar(&Lang, "lang", language.English.String(), "Language code (en/zh-CN/...)")
+
 	flag.Parse()
+
+	langTag, err := language.Parse(Lang)
+	if err != nil {
+		langTag = language.English
+	}
+
+	langFile := fmt.Sprintf("locales/%s/active.%s.toml", langTag.String(), langTag.String())
+	if data, err := localeFS.ReadFile(langFile); err == nil {
+		bundle.ParseMessageFileBytes(data, langFile)
+	} else {
+		if enData, err := localeFS.ReadFile("locales/en/active.en.toml"); err == nil {
+			bundle.ParseMessageFileBytes(enData, "locales/en/active.en.toml")
+		}
+	}
+
+	localizer := i18n.NewLocalizer(bundle, langTag.String())
+
+	T := func(key string) string {
+		return localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: key})
+	}
 
 	s := server.NewMCPServer(
 		"go-mcp-postgres",
-		"0.1.1",
+		"0.2.1",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithLogging(),
@@ -79,84 +114,84 @@ func main() {
 	// Schema Tools
 	listDatabaseTool := mcp.NewTool(
 		"list_database",
-		mcp.WithDescription("List all databases in the POSTGRES server"),
+		mcp.WithDescription(T("gomcp.list_database")),
 	)
 
 	listTableTool := mcp.NewTool(
 		"list_table",
-		mcp.WithDescription("List all tables in the POSTGRES server"),
+		mcp.WithDescription(T("gomcp.list_table")),
 	)
 
 	createTableTool := mcp.NewTool(
 		"create_table",
-		mcp.WithDescription("Create a new table in the POSTGRES server. Make sure you have added proper comments for each column and the table itself"),
+		mcp.WithDescription(T("gomcp.create_table")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to create the table"),
+			mcp.Description(T("gomcp.create_table_query_description")),
 		),
 	)
 
 	alterTableTool := mcp.NewTool(
 		"alter_table",
-		mcp.WithDescription("Alter an existing table in the POSTGRES server. Make sure you have updated comments for each modified column. DO NOT drop table or existing columns!"),
+		mcp.WithDescription(T("gomcp.alter_table")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to alter the table"),
+			mcp.Description(T("gomcp.alter_table_query")),
 		),
 	)
-	/*
-		descTableTool := mcp.NewTool(
-			"desc_table",
-			mcp.WithDescription("Describe the structure of a table"),
-			mcp.WithString("name",
-				mcp.Required(),
-				mcp.Description("The name of the table to describe"),
-			),
-		)
-	*/
+
+	descTableTool := mcp.NewTool(
+		"desc_table",
+		mcp.WithDescription(T("gomcp.desc_table")),
+		mcp.WithString("name",
+			mcp.Required(),
+			mcp.Description(T("gomcp.desc_table_name")),
+		),
+	)
+
 	// Data Tools
 	readQueryTool := mcp.NewTool(
 		"read_query",
-		mcp.WithDescription("Execute a read-only SQL query. Make sure you have knowledge of the table structure before writing WHERE conditions. Call `desc_table` first if necessary"),
+		mcp.WithDescription(T("gomcp.read_query")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to execute"),
+			mcp.Description(T("gomcp.query_execute_description")),
 		),
 	)
 
 	countQueryTool := mcp.NewTool(
 		"count_query",
-		mcp.WithDescription("Query the number of rows in a certain table."),
+		mcp.WithDescription(T("gomcp.count_query")),
 		mcp.WithString("name",
 			mcp.Required(),
-			mcp.Description("The name of the table to query"),
+			mcp.Description(T("gomcp.count_query_name")),
 		),
 	)
 
 	writeQueryTool := mcp.NewTool(
 		"write_query",
-		mcp.WithDescription("Execute a write SQL query. Make sure you have knowledge of the table structure before executing the query. Make sure the data types match the columns' definitions"),
+		mcp.WithDescription(T("gomcp.write_query")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to execute"),
+			mcp.Description(T("gomcp.query_execute_description")),
 		),
 	)
 
 	updateQueryTool := mcp.NewTool(
 		"update_query",
-		mcp.WithDescription("Execute an update SQL query. Make sure you have knowledge of the table structure before executing the query. Make sure there is always a WHERE condition. Call `desc_table` first if necessary"),
+		mcp.WithDescription(T("gomcp.update_query")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to execute"),
+			mcp.Description(T("gomcp.query_execute_description")),
 		),
 	)
 
 	deleteQueryTool := mcp.NewTool(
 		"delete_query",
-		mcp.WithDescription("Execute a delete SQL query. Make sure you have knowledge of the table structure before executing the query. Make sure there is always a WHERE condition. Call `desc_table` first if necessary"),
+		mcp.WithDescription(T("gomcp.delete_query")),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("The SQL query to execute"),
+			mcp.Description(T("gomcp.query_execute_description")),
 		),
 	)
 
@@ -207,16 +242,44 @@ func main() {
 
 		return mcp.NewToolResultText(result), nil
 	})
-	/*
-		s.AddTool(descTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			result, err := HandleDescTable(request.Params.Arguments["name"].(string))
-			if err != nil {
-				return nil, nil
-			}
 
-			return mcp.NewToolResultText(result), nil
-		})
-	*/
+	s.AddTool(descTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		descsql :=
+			`SELECT
+    'CREATE TABLE ' || t.table_name || ' (' ||
+    string_agg(
+        c.column_name || ' ' || c.data_type ||
+        CASE 
+            WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')'
+            ELSE ''
+        END ||
+        CASE 
+            WHEN c.is_nullable = 'NO' THEN ' NOT NULL'
+            ELSE ''
+        END, ', '
+    ) ||
+    ', PRIMARY KEY (' || (
+        SELECT string_agg(kcu.column_name, ', ')
+        FROM information_schema.key_column_usage kcu
+        WHERE kcu.table_name = t.table_name AND kcu.constraint_name LIKE '%_pkey'
+    ) || ')' ||
+    ');' AS create_table_sql
+FROM
+    information_schema.tables t
+JOIN
+    information_schema.columns c ON t.table_name = c.table_name
+WHERE
+    t.table_name = '` + request.Params.Arguments["name"].(string) + `'
+GROUP BY
+    t.table_name;`
+		result, err := HandleQuery(descsql, StatementTypeNoExplainCheck)
+		if err != nil {
+			return nil, nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
+
 	s.AddTool(readQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, err := HandleQuery(request.Params.Arguments["query"].(string), StatementTypeSelect)
 		if err != nil {
@@ -447,13 +510,14 @@ func HandleExplain(query, expect string) error {
 	return nil
 }
 
+/*
 func HandleDescTable(name string) (string, error) {
 	db, err := GetDB()
 	if err != nil {
 		return "", err
 	}
 
-	rows, err := db.Queryx(fmt.Sprintf("SHOW CREATE TABLE %s", name))
+	rows, err := db.Queryx(descsql)
 	if err != nil {
 		return "", err
 	}
@@ -472,7 +536,7 @@ func HandleDescTable(name string) (string, error) {
 	}
 
 	return result[0].CreateTable, nil
-}
+}*/
 
 func MapToCSV(m []map[string]interface{}, headers []string) (string, error) {
 	var csvBuf strings.Builder

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Copy code from https://github.com/Zhwt/go-mcp-mysql/ and with ai help, I change db from mysql to postgres.
+Copy code from https://github.com/Zhwt/go-mcp-mysql/ and with AI help, I change db from mysql to postgres.
 Zero burden, ready-to-use Model Context Protocol (MCP) server for interacting with Postgres and automation. No Node.js or Python environment needed. This server provides tools to do CRUD operations on MySQL databases and tables, and a read-only mode to prevent surprise write operations. You can also make the MCP server check the query plan by using a `EXPLAIN` statement before executing the query by adding a `--with-explain-check` flag.
 
 Please note that this is a work in progress and may not yet be ready for production use.
@@ -54,33 +54,39 @@ Note: For those who put the binary outside of your `$PATH`, you need to replace 
 
 ### Method B: Using Command Line Arguments for sse mode
 
-./go-mcp-postgres --t sse --ip x.x.x.x --port nnnn --dsn postgresql://user:pass@host:port/db
+./go-mcp-postgres --t sse --ip x.x.x.x --port nnnn --dsn postgresql://user:pass@host:port/db --lang en
 
 ### Optional Flags
 
+- `--lang`: Set language option (en/zh-CN), defaults to system language
 - Add a `--read-only` flag to enable read-only mode. In this mode, only tools beginning with `list`, `read_` and `desc_` are available. Make sure to refresh/restart the MCP server after adding this flag.
 - By default, CRUD queries will be first executed with a `EXPLAIN ?` statement to check whether the generated query plan matches the expected pattern. Add a `--with-explain-check` flag to disable this behavior.
 
 ## Tools
 
+_Multi-language support: All tool descriptions will automatically localize based on lang parameter_
+
+If you want to add your own language support, please refer to the [locales](for i18n) folder.
+The new locales/xxx/active-xx.toml file should be created if you want to use it in command line.
+
 ### Schema Tools
 
 1. `list_database`
 
-    - List all databases in the Postgres server.
+    - ${mcp.tool.list_database.desc}
     - Parameters: None
     - Returns: A list of matching database names.
 
 2. `list_table`
 
-    - List all tables in the Postgres server.
+    - ${mcp.tool.list_table.desc}
     - Parameters:
         - `name`: If provided, list tables with the specified name, Otherwise, list all tables.
     - Returns: A list of matching table names.
 
 3. `create_table`
 
-    - Create a new table in the Postgres server.
+    - ${mcp.tool.create_table.desc}
     - Parameters:
         - `query`: The SQL query to create the table.
     - Returns: x rows affected.

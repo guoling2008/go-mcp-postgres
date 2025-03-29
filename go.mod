@@ -8,7 +8,10 @@ require (
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mark3labs/mcp-go v0.17.0
+	github.com/nicksnyder/go-i18n/v2 v2.2.2
+	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/text v0.23.0
 )
 
 require (
@@ -23,6 +26,5 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
