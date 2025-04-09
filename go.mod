@@ -1,4 +1,4 @@
-module github.com/Zhwt/go-mcp-postgres
+module github.com/guoling2008/go-mcp-postgres
 
 go 1.23.1
 
