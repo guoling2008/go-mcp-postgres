@@ -28,4 +28,4 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/go-mcp-postgres:$(date +%s)
+        tags: guoling21cn/go-mcp-postgres:latest
